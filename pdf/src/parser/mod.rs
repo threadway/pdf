@@ -172,9 +172,25 @@ fn _parse_with_lexer_ctx(lexer: &mut Lexer, r: &impl Resolve, ctx: Option<&Conte
         // First backup position
         let pos_bk = lexer.get_pos();
 
-        let second_lexeme = t!(lexer.next());
+        // (At the end of the input — an object stream's last object — it's
+        // an integer: there's nothing after it to make it a reference.)
+        let second_lexeme = match lexer.next() {
+            Err(PdfError::EOF) => {
+                check(flags, ParseFlags::INTEGER)?;
+                lexer.set_pos(pos_bk);
+                return Ok(Primitive::Integer(t!(first_lexeme.to::<i64>())));
+            }
+            other => t!(other),
+        };
         if second_lexeme.is_integer() {
-            let third_lexeme = t!(lexer.next());
+            let third_lexeme = match lexer.next() {
+                Err(PdfError::EOF) => {
+                    check(flags, ParseFlags::INTEGER)?;
+                    lexer.set_pos(pos_bk);
+                    return Ok(Primitive::Integer(t!(first_lexeme.to::<i64>())));
+                }
+                other => t!(other),
+            };
             if third_lexeme.equals(b"R") {
                 // It is indeed a reference to an indirect object
                 check(flags, ParseFlags::REF)?;
